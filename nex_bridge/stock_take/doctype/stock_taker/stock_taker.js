@@ -9,6 +9,7 @@ frappe.ui.form.on('Stock Taker', {
 			new frappe.ui.form.MultiSelectDialog({
 				doctype: 'Item Group',
 				target: frm,
+				setters: {},
 				get_query: () => ({ filters: {} }),
 				primary_action_label: __('Add Items'),
 				action: (groups) => {
