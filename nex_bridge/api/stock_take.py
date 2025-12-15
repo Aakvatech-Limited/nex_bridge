@@ -131,10 +131,26 @@ def sync_entry():
                         )
 
                     for item in entry_items:
-                        barcode = item.get("barcode")
+                        barcode = (item.get("barcode") or "").strip()
+                        item_code = (item.get("item_code") or "").strip()
+                        item_name = None
                         warehouse = item.get("warehouse")
                         qty = item.get("qty")
                         local_item_id = item.get("local_id")
+
+                        if barcode and not item_code:
+                            item_code = frappe.db.get_value(
+                                "Item Barcode", {"barcode": barcode}, "parent"
+                            )
+                            if item_code:
+                                item_name = frappe.db.get_value(
+                                    "Item", item_code, "item_name"
+                                )
+                                barcode = ""
+                        elif item_code:
+                            item_name = frappe.db.get_value(
+                                "Item", item_code, "item_name"
+                            )
 
                         existing_item = None
                         for existing in doc.items:
@@ -144,6 +160,10 @@ def sync_entry():
 
                         if existing_item:
                             existing_item.barcode = barcode
+                            if item_code:
+                                existing_item.item_code = item_code
+                            if item_name:
+                                existing_item.item_name = item_name
                             existing_item.warehouse = warehouse
                             existing_item.qty = qty
                         else:
@@ -151,6 +171,8 @@ def sync_entry():
                                 "items",
                                 {
                                     "barcode": barcode,
+                                    "item_code": item_code or None,
+                                    "item_name": item_name,
                                     "warehouse": warehouse,
                                     "qty": qty,
                                     "local_id": local_item_id,

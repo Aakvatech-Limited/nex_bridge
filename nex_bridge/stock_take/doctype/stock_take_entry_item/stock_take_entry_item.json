@@ -25,7 +25,7 @@
    "fieldtype": "Data",
    "label": "Barcode",
    "print_hide": 1,
-   "reqd": 1
+   "reqd": 0
   },
   {
    "columns": 3,
