@@ -121,6 +121,7 @@ def create_stock_reconciliation(stock_take_entry: str, purpose: str):
             },
         )
 
+    stock_reco.flags.ignore_validate = True
     stock_reco.insert()
     doc.db_set("stock_reconciliation", stock_reco.name, update_modified=False)
 

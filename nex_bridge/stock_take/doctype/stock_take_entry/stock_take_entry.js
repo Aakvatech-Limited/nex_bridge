@@ -4,6 +4,7 @@
 frappe.ui.form.on('Stock Take Entry', {
 	refresh(frm) {
 		if (frm.doc.docstatus !== 1) return;
+		if (frm.doc.stock_reconciliation) return;
 
 		frm.add_custom_button(__('Create Stock Reconciliation'), () => {
 			frappe.prompt(
