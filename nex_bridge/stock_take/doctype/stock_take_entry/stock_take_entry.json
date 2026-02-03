@@ -22,6 +22,7 @@
   "sb9",
   "items",
   "section_break_9",
+  "stock_reconciliation",
   "amended_from"
  ],
  "fields": [
@@ -112,6 +113,15 @@
   {
    "fieldname": "section_break_9",
    "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "stock_reconciliation",
+   "fieldtype": "Link",
+   "label": "Stock Reconciliation",
+   "no_copy": 1,
+   "options": "Stock Reconciliation",
+   "read_only": 1
   },
   {
    "fieldname": "amended_from",

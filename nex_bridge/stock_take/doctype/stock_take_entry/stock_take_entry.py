@@ -122,6 +122,6 @@ def create_stock_reconciliation(stock_take_entry: str, purpose: str):
         )
 
     stock_reco.insert()
-    stock_reco.submit()
+    doc.db_set("stock_reconciliation", stock_reco.name, update_modified=False)
 
     return stock_reco.name

@@ -33,7 +33,7 @@ frappe.ui.form.on('Stock Take Entry', {
 							if (!r.message) return;
 
 							frappe.msgprint({
-								message: __('Stock Reconciliation {0} created and submitted.', [r.message]),
+								message: __('Stock Reconciliation {0} created.', [r.message]),
 								indicator: 'green',
 							});
 
