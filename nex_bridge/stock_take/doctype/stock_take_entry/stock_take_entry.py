@@ -28,6 +28,11 @@ class StockTakeEntry(Document):
             if not row.barcode:
                 continue
 
+            if frappe.db.exists("Item", row.barcode):
+                row.item_code = row.barcode
+                row.item_name = frappe.db.get_value("Item", row.item_code, "item_name")
+                continue
+
             matches = frappe.get_all(
                 "Item Barcode",
                 filters={"barcode": row.barcode},

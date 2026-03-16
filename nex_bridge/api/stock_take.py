@@ -147,6 +147,12 @@ def sync_entry():
                                     "Item", item_code, "item_name"
                                 )
                                 barcode = ""
+                            elif frappe.db.exists("Item", barcode):
+                                # Assigned items from mobile are item codes, not barcodes.
+                                item_code = barcode
+                                item_name = frappe.db.get_value(
+                                    "Item", item_code, "item_name"
+                                )
                         elif item_code:
                             item_name = frappe.db.get_value(
                                 "Item", item_code, "item_name"
@@ -232,6 +238,7 @@ def sync_entry():
                     "set_warehouse",
                     "posting_date",
                     "posting_time",
+                    "scan_mode",
                     "local_id",
                     "owner",
                 ],
@@ -244,6 +251,8 @@ def sync_entry():
                     fields=[
                         "name",
                         "barcode",
+                        "item_code",
+                        "item_name",
                         "warehouse",
                         "qty",
                         "current_qty",
