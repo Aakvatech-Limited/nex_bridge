@@ -79,6 +79,9 @@ def sync_entry():
             data = json.loads(frappe.request.data)
             entries = data.get("entries", [])
             synced_entries = []
+            has_scan_reference_mode = frappe.get_meta("Stock Take Entry").has_field(
+                "scan_reference_mode"
+            )
 
             if not entries:
                 frappe.log_error("Sync Bulk Entries Error", "No entries to sync")
@@ -98,6 +101,7 @@ def sync_entry():
                 posting_date = entry.get("posting_date")
                 posting_time = entry.get("posting_time")
                 scan_mode = entry.get("scan_mode", 0)
+                scan_reference_mode = (entry.get("scan_reference_mode") or "").strip()
 
                 frappe.log_error(
                     "Processing Entry", f"Processing entry with local_id {local_id}"
@@ -116,19 +120,22 @@ def sync_entry():
                         doc.posting_date = posting_date
                         doc.posting_time = posting_time
                         doc.scan_mode = scan_mode
+                        if has_scan_reference_mode:
+                            doc.scan_reference_mode = scan_reference_mode
                     else:
-                        doc = frappe.get_doc(
-                            {
-                                "doctype": "Stock Take Entry",
-                                "company": company,
-                                "set_warehouse": set_warehouse,
-                                "posting_date": posting_date,
-                                "posting_time": posting_time,
-                                "scan_mode": scan_mode,
-                                "local_id": local_id,
-                                "items": [],
-                            }
-                        )
+                        payload = {
+                            "doctype": "Stock Take Entry",
+                            "company": company,
+                            "set_warehouse": set_warehouse,
+                            "posting_date": posting_date,
+                            "posting_time": posting_time,
+                            "scan_mode": scan_mode,
+                            "local_id": local_id,
+                            "items": [],
+                        }
+                        if has_scan_reference_mode:
+                            payload["scan_reference_mode"] = scan_reference_mode
+                        doc = frappe.get_doc(payload)
 
                     for item in entry_items:
                         barcode = (item.get("barcode") or "").strip()
@@ -228,20 +235,26 @@ def sync_entry():
     elif api_call_type == "get_entries":
         try:
             auth_user = frappe.session.user
+            has_scan_reference_mode = frappe.get_meta("Stock Take Entry").has_field(
+                "scan_reference_mode"
+            )
+            entry_fields = [
+                "name",
+                "company",
+                "set_warehouse",
+                "posting_date",
+                "posting_time",
+                "scan_mode",
+                "local_id",
+                "owner",
+            ]
+            if has_scan_reference_mode:
+                entry_fields.append("scan_reference_mode")
 
             entries = frappe.get_all(
                 "Stock Take Entry",
                 filters={"owner": auth_user},
-                fields=[
-                    "name",
-                    "company",
-                    "set_warehouse",
-                    "posting_date",
-                    "posting_time",
-                    "scan_mode",
-                    "local_id",
-                    "owner",
-                ],
+                fields=entry_fields,
             )
 
             for entry in entries:
