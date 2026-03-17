@@ -90,7 +90,8 @@
   {
    "fieldname": "local_id",
    "fieldtype": "Data",
-   "label": "Local ID"
+   "label": "Local ID",
+   "read_only": 1
   }
  ],
  "istable": 1,
