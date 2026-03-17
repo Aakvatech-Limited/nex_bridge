@@ -68,20 +68,26 @@ def get_user_assigned_items():
 
 @frappe.whitelist()
 def sync_entry():
-    api_call_type = frappe.form_dict.get("api_call_type")
+    request_payload = {}
+    if frappe.request and frappe.request.data:
+        try:
+            request_payload = json.loads(frappe.request.data)
+        except Exception:
+            request_payload = {}
+
+    api_call_type = frappe.form_dict.get("api_call_type") or request_payload.get(
+        "api_call_type"
+    )
     if api_call_type == "sync_bulk_entries":
         try:
-            frappe.log_error(
-                title="Sync Bulk Entries Started",
-                message=f"Full Data: {frappe.request.data}",
-            )
-
-            data = json.loads(frappe.request.data)
+            data = request_payload or {}
             entries = data.get("entries", [])
             synced_entries = []
+            failed_entries = []
             has_scan_reference_mode = frappe.get_meta("Stock Take Entry").has_field(
                 "scan_reference_mode"
             )
+            current_user = frappe.session.user
 
             if not entries:
                 frappe.log_error("Sync Bulk Entries Error", "No entries to sync")
@@ -103,15 +109,17 @@ def sync_entry():
                 scan_mode = entry.get("scan_mode", 0)
                 scan_reference_mode = (entry.get("scan_reference_mode") or "").strip()
 
-                frappe.log_error(
-                    "Processing Entry", f"Processing entry with local_id {local_id}"
-                )
-
                 try:
                     existing_entry = frappe.get_all(
                         "Stock Take Entry",
-                        filters={"local_id": local_id},
+                        filters={
+                            "local_id": local_id,
+                            "owner": current_user,
+                            "docstatus": 0,
+                        },
                         fields=["name"],
+                        order_by="creation desc",
+                        limit=1,
                     )
                     if existing_entry:
                         doc = frappe.get_doc("Stock Take Entry", existing_entry[0].name)
@@ -215,6 +223,7 @@ def sync_entry():
                     synced_entries.append(synced_entry)
 
                 except Exception as e:
+                    failed_entries.append({"local_id": local_id, "error": str(e)})
                     frappe.log_error(
                         f"Failed to process entry with local_id {local_id}", str(e)
                     )
@@ -222,10 +231,22 @@ def sync_entry():
 
             frappe.db.commit()
 
+            status = "success"
+            message = "Bulk entries synced successfully"
+            if failed_entries and synced_entries:
+                status = "partial_success"
+                message = (
+                    f"Synced {len(synced_entries)} entries and failed {len(failed_entries)} entries"
+                )
+            elif failed_entries and not synced_entries:
+                status = "error"
+                message = "No entries were synced"
+
             frappe.response["message"] = {
-                "status": "success",
-                "message": "Bulk entries synced successfully",
+                "status": status,
+                "message": message,
                 "synced_entries": synced_entries or [],
+                "failed_entries": failed_entries or [],
             }
 
         except Exception as e:
