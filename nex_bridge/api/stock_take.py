@@ -2,29 +2,6 @@ import json
 import frappe
 
 
-def _get_assigned_item_codes(user_email):
-    stock_taker_records = frappe.db.get_list(
-        "Stock Taker",
-        filters={"stock_taker": user_email},
-        fields=["name"],
-        limit=1000,
-    )
-
-    item_codes = set()
-    for record in stock_taker_records:
-        items = frappe.get_all(
-            "Stock Taker Item",
-            filters={"parent": record["name"]},
-            fields=["item"],
-        )
-        for row in items:
-            item_code = (row.get("item") or "").strip()
-            if item_code:
-                item_codes.add(item_code)
-
-    return sorted(item_codes)
-
-
 @frappe.whitelist()
 def get_warehouses_grouped_by_company():
     # Ensure the user is authenticated
@@ -60,67 +37,20 @@ def get_warehouses_grouped_by_company():
 
 
 @frappe.whitelist()
-def get_user_assigned_items():
-    user_email = frappe.session.user
-    if not user_email or user_email == "Guest":
-        frappe.response["message"] = "User must be logged in to access this resource."
-        return
-
-    stock_taker_records = frappe.db.get_list(
-        "Stock Taker",
-        filters={"stock_taker": user_email},
-        fields=["name", "stock_taker"],
-        limit=1000,
-    )
-
-    if not stock_taker_records:
-        frappe.response["message"] = "No assigned items found for this user."
-        return
-
-    assigned_items = []
-    for record in stock_taker_records:
-        items = frappe.get_all(
-            "Stock Taker Item",
-            filters={"parent": record["name"]},
-            fields=["name", "item"],
-        )
-        assigned_items.extend(items)
-
-    frappe.response["message"] = {"assigned_items": assigned_items}
-
-
-@frappe.whitelist()
 def get_scan_reference_masters():
     user_email = frappe.session.user
     if not user_email or user_email == "Guest":
         frappe.response["message"] = "User must be logged in to access this resource."
         return
 
-    item_codes = _get_assigned_item_codes(user_email)
-    if not item_codes:
-        frappe.response["message"] = {
-            "items": [],
-            "barcodes": [],
-            "batches": [],
-            "serial_nos": [],
-        }
-        return
-
-    items = frappe.get_all(
-        "Item",
-        filters={"name": ["in", item_codes]},
-        fields=["name as item_code", "item_name", "has_serial_no", "has_batch_no"],
-        limit=5000,
-    )
-
+    # Pull global masters for offline scan modes.
     barcodes = frappe.get_all(
         "Item Barcode",
-        filters={"parent": ["in", item_codes]},
         fields=["parent as item_code", "barcode"],
-        limit=20000,
+        limit=100000,
     )
 
-    batch_filters = {"item": ["in", item_codes]}
+    batch_filters = {}
     if frappe.get_meta("Batch").has_field("disabled"):
         batch_filters["disabled"] = 0
 
@@ -131,7 +61,7 @@ def get_scan_reference_masters():
         limit=20000,
     )
 
-    serial_filters = {"item_code": ["in", item_codes]}
+    serial_filters = {}
     if frappe.get_meta("Serial No").has_field("status"):
         serial_filters["status"] = ["!=", "Inactive"]
 
@@ -142,11 +72,44 @@ def get_scan_reference_masters():
         limit=50000,
     )
 
+    item_filters = {}
+    if frappe.get_meta("Item").has_field("disabled"):
+        item_filters["disabled"] = 0
+
+    master_item_codes = {
+        (d.get("name") or "").strip()
+        for d in frappe.get_all(
+            "Item",
+            filters=item_filters,
+            fields=["name"],
+            limit=100000,
+        )
+        if (d.get("name") or "").strip()
+    }
+
+    item_codes = {
+        (d.get("item_code") or "").strip()
+        for d in (barcodes + batches + serial_nos)
+        if (d.get("item_code") or "").strip()
+    }
+    item_codes.update(master_item_codes)
+
+    items = []
+    if item_codes:
+        items = frappe.get_all(
+            "Item",
+            filters={"name": ["in", sorted(item_codes)]},
+            fields=["name as item_code", "item_name", "has_serial_no", "has_batch_no"],
+            limit=100000,
+        )
+
     frappe.response["message"] = {
         "items": items,
         "barcodes": barcodes,
         "batches": batches,
         "serial_nos": serial_nos,
+        "scope": "all",
+        "item_count": len(master_item_codes),
     }
 
 
