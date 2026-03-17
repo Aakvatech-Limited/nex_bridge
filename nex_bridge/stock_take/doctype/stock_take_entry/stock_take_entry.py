@@ -182,18 +182,20 @@ def create_stock_reconciliation(stock_take_entry: str, purpose: str):
                 ).format(row.idx)
             )
 
+        batch_no = row.batch_no
+        serial_no = row.serial_no
+        qty = row.qty or 0
+
         stock_reco.append(
             "items",
             {
                 "item_code": row.item_code,
                 "warehouse": warehouse,
-                "qty": row.qty or 0,
+                "qty": qty,
                 "barcode": row.barcode,
-                "batch_no": getattr(row, "batch_no", None),
-                "serial_no": getattr(row, "serial_no", None),
-                "use_serial_batch_fields": 1
-                if getattr(row, "batch_no", None) or getattr(row, "serial_no", None)
-                else 0,
+                "batch_no": batch_no,
+                "serial_no": serial_no,
+                "use_serial_batch_fields": 1 if batch_no or serial_no else 0,
                 "allow_zero_valuation_rate": 1,
             },
         )
