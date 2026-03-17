@@ -8,7 +8,11 @@
  "engine": "InnoDB",
  "field_order": [
   "barcode",
+  "scan_reference_mode",
+  "scan_value",
   "item_code",
+  "batch_no",
+  "serial_no",
   "item_name",
   "local_id",
   "column_break_6",
@@ -28,6 +32,17 @@
    "reqd": 0
   },
   {
+   "fieldname": "scan_reference_mode",
+   "fieldtype": "Select",
+   "label": "Scan Reference Mode",
+   "options": "\nItem Code\nBatch No\nSerial No"
+  },
+  {
+   "fieldname": "scan_value",
+   "fieldtype": "Data",
+   "label": "Scan Value"
+  },
+  {
    "columns": 3,
    "fieldname": "item_code",
    "fieldtype": "Link",
@@ -45,6 +60,17 @@
    "no_copy": 1,
    "print_hide": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "batch_no",
+   "fieldtype": "Link",
+   "label": "Batch No",
+   "options": "Batch"
+  },
+  {
+   "fieldname": "serial_no",
+   "fieldtype": "Data",
+   "label": "Serial No"
   },
   {
    "fieldname": "column_break_6",

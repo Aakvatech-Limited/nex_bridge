@@ -14,7 +14,7 @@ class StockTakeEntry(Document):
         self._resolve_items_from_barcodes()
 
     def _resolve_items_from_barcodes(self):
-        """Populate missing item_code values from scanned barcodes before submit."""
+        """Populate missing item_code values from scanned reference before submit."""
         for row in self.items or []:
             if not row.warehouse and self.set_warehouse:
                 row.warehouse = self.set_warehouse
@@ -22,7 +22,74 @@ class StockTakeEntry(Document):
             if row.qty is None:
                 row.qty = 0
 
+            mode = (getattr(row, "scan_reference_mode", None) or self.scan_reference_mode or "").strip()
+            scan_value = (
+                getattr(row, "scan_value", None)
+                or row.barcode
+                or row.item_code
+                or getattr(row, "batch_no", None)
+                or getattr(row, "serial_no", None)
+                or ""
+            ).strip()
+
+            if hasattr(row, "scan_value") and not row.scan_value:
+                row.scan_value = scan_value
+
             if row.item_code:
+                continue
+
+            if mode == "Item Code":
+                item_code = scan_value
+                if not item_code or not frappe.db.exists("Item", item_code):
+                    frappe.throw(
+                        _("Row #{0}: Item Code {1} not found.").format(
+                            row.idx, frappe.bold(scan_value or "")
+                        )
+                    )
+                row.item_code = item_code
+                row.item_name = frappe.db.get_value("Item", row.item_code, "item_name")
+                row.barcode = ""
+                continue
+
+            if mode == "Batch No":
+                batch_no = getattr(row, "batch_no", None) or scan_value
+                item_code = frappe.db.get_value("Batch", batch_no, "item") if batch_no else None
+                if not item_code:
+                    frappe.throw(
+                        _("Row #{0}: Batch {1} was not found.").format(
+                            row.idx, frappe.bold(batch_no or "")
+                        )
+                    )
+                row.batch_no = batch_no
+                row.item_code = item_code
+                row.item_name = frappe.db.get_value("Item", row.item_code, "item_name")
+                row.barcode = ""
+                continue
+
+            if mode == "Serial No":
+                serial_no = getattr(row, "serial_no", None) or scan_value
+                serial_data = (
+                    frappe.db.get_value(
+                        "Serial No",
+                        serial_no,
+                        ["item_code", "batch_no"],
+                        as_dict=True,
+                    )
+                    if serial_no
+                    else None
+                )
+                if not serial_data or not serial_data.get("item_code"):
+                    frappe.throw(
+                        _("Row #{0}: Serial No {1} was not found.").format(
+                            row.idx, frappe.bold(serial_no or "")
+                        )
+                    )
+                row.serial_no = serial_no
+                if hasattr(row, "batch_no") and not row.batch_no:
+                    row.batch_no = serial_data.get("batch_no")
+                row.item_code = serial_data.get("item_code")
+                row.item_name = frappe.db.get_value("Item", row.item_code, "item_name")
+                row.barcode = ""
                 continue
 
             if not row.barcode:
@@ -122,6 +189,11 @@ def create_stock_reconciliation(stock_take_entry: str, purpose: str):
                 "warehouse": warehouse,
                 "qty": row.qty or 0,
                 "barcode": row.barcode,
+                "batch_no": getattr(row, "batch_no", None),
+                "serial_no": getattr(row, "serial_no", None),
+                "use_serial_batch_fields": 1
+                if getattr(row, "batch_no", None) or getattr(row, "serial_no", None)
+                else 0,
                 "allow_zero_valuation_rate": 1,
             },
         )
