@@ -17,11 +17,7 @@
   "local_id",
   "column_break_6",
   "warehouse",
-  "qty",
-  "section_break_3",
-  "current_qty",
-  "section_break_14",
-  "quantity_difference"
+  "qty"
  ],
  "fields": [
   {
@@ -92,27 +88,6 @@
    "fieldtype": "Float",
    "in_list_view": 1,
    "label": "Quantity"
-  },
-  {
-   "fieldname": "section_break_3",
-   "fieldtype": "Section Break",
-   "label": "Before reconciliation"
-  },
-  {
-   "default": "0",
-   "fieldname": "current_qty",
-   "fieldtype": "Float",
-   "label": "Current Qty",
-   "read_only": 1
-  },
-  {
-   "fieldname": "section_break_14",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "quantity_difference",
-   "fieldtype": "Read Only",
-   "label": "Quantity Difference"
   },
   {
    "fieldname": "local_id",
