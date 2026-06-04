@@ -17,7 +17,9 @@
   "local_id",
   "column_break_6",
   "warehouse",
-  "qty"
+  "qty",
+  "current_qty",
+  "quantity_difference"
  ],
  "fields": [
   {
@@ -88,6 +90,18 @@
    "fieldtype": "Float",
    "in_list_view": 1,
    "label": "Quantity"
+  },
+  {
+   "default": "0",
+   "fieldname": "current_qty",
+   "fieldtype": "Float",
+   "label": "Current Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "quantity_difference",
+   "fieldtype": "Read Only",
+   "label": "Quantity Difference"
   },
   {
    "fieldname": "local_id",

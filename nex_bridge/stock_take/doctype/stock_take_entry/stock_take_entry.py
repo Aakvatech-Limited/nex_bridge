@@ -7,8 +7,12 @@ from frappe.model.document import Document
 
 
 class StockTakeEntry(Document):
-    def before_submit(self):
+    def validate(self):
         self._resolve_items_from_barcodes()
+        self._calculate_differences()
+
+    def before_submit(self):
+        pass
 
     def _resolve_items_from_barcodes(self):
         """Populate missing item_code values from scanned reference before submit."""
@@ -121,5 +125,40 @@ class StockTakeEntry(Document):
             row.item_code = matches[0].parent
             row.item_name = frappe.db.get_value("Item", row.item_code, "item_name")
 
+    def _calculate_differences(self):
+        from erpnext.stock.utils import get_stock_balance
 
+        for row in self.items or []:
+            if not row.item_code:
+                continue
 
+            warehouse = row.warehouse or self.set_warehouse
+            if not warehouse:
+                continue
+
+            current_qty = 0.0
+
+            if row.serial_no:
+                sn_data = frappe.db.get_value(
+                    "Serial No", row.serial_no, ["status", "warehouse"], as_dict=True
+                )
+                if sn_data and sn_data.get("status") == "Active" and sn_data.get("warehouse") == warehouse:
+                    current_qty = 1.0
+            elif row.batch_no:
+                try:
+                    current_qty = get_stock_balance(
+                        row.item_code,
+                        warehouse,
+                        self.posting_date,
+                        self.posting_time,
+                        batch_no=row.batch_no,
+                    )
+                except Exception:
+                    pass
+            else:
+                current_qty = frappe.db.get_value(
+                    "Bin", {"item_code": row.item_code, "warehouse": warehouse}, "actual_qty"
+                ) or 0.0
+
+            row.current_qty = current_qty
+            row.quantity_difference = (row.qty or 0.0) - current_qty
