@@ -126,7 +126,7 @@ class StockTakeEntry(Document):
             row.item_name = frappe.db.get_value("Item", row.item_code, "item_name")
 
     def _calculate_differences(self):
-        from erpnext.stock.utils import get_stock_balance
+        from erpnext.stock.doctype.batch.batch import get_batch_qty
 
         for row in self.items or []:
             if not row.item_code:
@@ -146,12 +146,12 @@ class StockTakeEntry(Document):
                     current_qty = 1.0
             elif row.batch_no:
                 try:
-                    current_qty = get_stock_balance(
-                        row.item_code,
-                        warehouse,
-                        self.posting_date,
-                        self.posting_time,
+                    current_qty = get_batch_qty(
                         batch_no=row.batch_no,
+                        warehouse=warehouse,
+                        item_code=row.item_code,
+                        posting_date=self.posting_date,
+                        posting_time=self.posting_time,
                     )
                 except Exception:
                     pass
@@ -160,5 +160,5 @@ class StockTakeEntry(Document):
                     "Bin", {"item_code": row.item_code, "warehouse": warehouse}, "actual_qty"
                 ) or 0.0
 
-            row.current_qty = current_qty
-            row.quantity_difference = (row.qty or 0.0) - current_qty
+            row.current_qty = current_qty or 0.0
+            row.quantity_difference = (row.qty or 0.0) - row.current_qty
