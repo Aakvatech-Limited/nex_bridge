@@ -4,14 +4,15 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from erpnext.stock.doctype.stock_reconciliation.stock_reconciliation import (
-    get_difference_account,
-)
 
 
 class StockTakeEntry(Document):
-    def before_submit(self):
+    def validate(self):
         self._resolve_items_from_barcodes()
+        self._calculate_differences()
+
+    def before_submit(self):
+        pass
 
     def _resolve_items_from_barcodes(self):
         """Populate missing item_code values from scanned reference before submit."""
@@ -124,84 +125,40 @@ class StockTakeEntry(Document):
             row.item_code = matches[0].parent
             row.item_name = frappe.db.get_value("Item", row.item_code, "item_name")
 
+    def _calculate_differences(self):
+        from erpnext.stock.doctype.batch.batch import get_batch_qty
 
-@frappe.whitelist()
-def create_stock_reconciliation(stock_take_entry: str, purpose: str):
-    doc = frappe.get_doc("Stock Take Entry", stock_take_entry)
+        for row in self.items or []:
+            if not row.item_code:
+                continue
 
-    if doc.docstatus != 1:
-        frappe.throw(
-            _("Only submitted Stock Take Entries can create a Stock Reconciliation.")
-        )
+            warehouse = row.warehouse or self.set_warehouse
+            if not warehouse:
+                continue
 
-    purpose = (purpose or "").strip()
-    purpose_map = {
-        "Open Stock": "Opening Stock",
-        "Opening Stock": "Opening Stock",
-        "Reconcile": "Stock Reconciliation",
-        "Stock Reconciliation": "Stock Reconciliation",
-    }
+            current_qty = 0.0
 
-    purpose_value = purpose_map.get(purpose)
-    if not purpose_value:
-        frappe.throw(_("Invalid purpose. Choose either Open Stock or Reconcile."))
+            if row.serial_no:
+                sn_data = frappe.db.get_value(
+                    "Serial No", row.serial_no, ["status", "warehouse"], as_dict=True
+                )
+                if sn_data and sn_data.get("status") == "Active" and sn_data.get("warehouse") == warehouse:
+                    current_qty = 1.0
+            elif row.batch_no:
+                try:
+                    current_qty = get_batch_qty(
+                        batch_no=row.batch_no,
+                        warehouse=warehouse,
+                        item_code=row.item_code,
+                        posting_date=self.posting_date,
+                        posting_time=self.posting_time,
+                    )
+                except Exception:
+                    pass
+            else:
+                current_qty = frappe.db.get_value(
+                    "Bin", {"item_code": row.item_code, "warehouse": warehouse}, "actual_qty"
+                ) or 0.0
 
-    if not doc.items:
-        frappe.throw(_("No items found on this Stock Take Entry."))
-
-    difference_account = get_difference_account(purpose_value, doc.company)
-    if not difference_account:
-        frappe.throw(
-            _(
-                "Please set a Difference Account (For Opening or Stock Adjustment for Reconciliation) for company {0}."
-            ).format(frappe.bold(doc.company))
-        )
-
-    stock_reco = frappe.new_doc("Stock Reconciliation")
-    stock_reco.company = doc.company
-    stock_reco.purpose = purpose_value
-    stock_reco.posting_date = doc.posting_date
-    stock_reco.posting_time = doc.posting_time
-    stock_reco.set_posting_time = 1
-    stock_reco.set_warehouse = doc.set_warehouse
-    stock_reco.expense_account = difference_account
-
-    for row in doc.items:
-        if not row.item_code:
-            frappe.throw(
-                _(
-                    "Row #{0}: Item Code is required to create a Stock Reconciliation."
-                ).format(row.idx)
-            )
-
-        warehouse = row.warehouse or doc.set_warehouse
-        if not warehouse:
-            frappe.throw(
-                _(
-                    "Row #{0}: Please set a Warehouse on the row or Default Warehouse on the entry."
-                ).format(row.idx)
-            )
-
-        batch_no = row.batch_no
-        serial_no = row.serial_no
-        qty = row.qty or 0
-
-        stock_reco.append(
-            "items",
-            {
-                "item_code": row.item_code,
-                "warehouse": warehouse,
-                "qty": qty,
-                "barcode": row.barcode,
-                "batch_no": batch_no,
-                "serial_no": serial_no,
-                "use_serial_batch_fields": 1 if batch_no or serial_no else 0,
-                "allow_zero_valuation_rate": 1,
-            },
-        )
-
-    stock_reco.flags.ignore_validate = True
-    stock_reco.insert()
-    doc.db_set("stock_reconciliation", stock_reco.name, update_modified=False)
-
-    return stock_reco.name
+            row.current_qty = current_qty or 0.0
+            row.quantity_difference = (row.qty or 0.0) - row.current_qty
