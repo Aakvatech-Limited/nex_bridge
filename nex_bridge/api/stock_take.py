@@ -37,6 +37,21 @@ def get_warehouses_grouped_by_company():
 
 
 @frappe.whitelist()
+def get_stock_take_settings():
+    # Ensure the user is authenticated
+    user_email = frappe.session.user
+    if not user_email or user_email == "Guest":
+        frappe.response["message"] = "User must be logged in to access this resource."
+        return
+
+    settings = frappe.get_single("Stock Take Settings")
+
+    frappe.response["message"] = {
+        "enable_stock_take_period": bool(settings.enable_stock_take_period),
+    }
+
+
+@frappe.whitelist()
 def get_scan_reference_masters():
     user_email = frappe.session.user
     if not user_email or user_email == "Guest":
