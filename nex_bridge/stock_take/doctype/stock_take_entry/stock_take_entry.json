@@ -20,6 +20,7 @@
   "column_break_12",
   "scan_mode",
   "scan_reference_mode",
+  "period",
   "sb9",
   "items",
   "section_break_9",
@@ -104,6 +105,15 @@
    "fieldtype": "Select",
    "label": "Scan Reference Mode",
    "options": "\nItem Code\nBatch No\nSerial No"
+  },
+  {
+   "description": "Groups this Stock Take Entry into a counting cycle (e.g. August's count) for filtering and duplicate-count validation. Only used when Stock Take Settings > Enable Stock Take Period is on.",
+   "fieldname": "period",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Stock Take Period",
+   "options": "\nJan\nFeb\nMar\nApr\nMay\nJun\nJul\nAug\nSep\nOct\nNov\nDec"
   },
   {
    "fieldname": "sb9",

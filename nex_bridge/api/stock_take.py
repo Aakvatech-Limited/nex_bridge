@@ -37,6 +37,21 @@ def get_warehouses_grouped_by_company():
 
 
 @frappe.whitelist()
+def get_stock_take_settings():
+    # Ensure the user is authenticated
+    user_email = frappe.session.user
+    if not user_email or user_email == "Guest":
+        frappe.response["message"] = "User must be logged in to access this resource."
+        return
+
+    settings = frappe.get_single("Stock Take Settings")
+
+    frappe.response["message"] = {
+        "enable_stock_take_period": bool(settings.enable_stock_take_period),
+    }
+
+
+@frappe.whitelist()
 def get_scan_reference_masters():
     user_email = frappe.session.user
     if not user_email or user_email == "Guest":
@@ -131,9 +146,9 @@ def sync_entry():
             entries = data.get("entries", [])
             synced_entries = []
             failed_entries = []
-            has_scan_reference_mode = frappe.get_meta("Stock Take Entry").has_field(
-                "scan_reference_mode"
-            )
+            entry_meta = frappe.get_meta("Stock Take Entry")
+            has_scan_reference_mode = entry_meta.has_field("scan_reference_mode")
+            has_period = entry_meta.has_field("period")
             entry_item_meta = frappe.get_meta("Stock Take Entry Item")
             has_item_scan_reference_mode = entry_item_meta.has_field(
                 "scan_reference_mode"
@@ -162,6 +177,7 @@ def sync_entry():
                 posting_time = entry.get("posting_time")
                 scan_mode = entry.get("scan_mode", 0)
                 scan_reference_mode = (entry.get("scan_reference_mode") or "").strip()
+                period = (entry.get("period") or "").strip()
 
                 try:
                     existing_entry = frappe.get_all(
@@ -184,6 +200,8 @@ def sync_entry():
                         doc.scan_mode = scan_mode
                         if has_scan_reference_mode:
                             doc.scan_reference_mode = scan_reference_mode
+                        if has_period:
+                            doc.period = period
                     else:
                         payload = {
                             "doctype": "Stock Take Entry",
@@ -197,6 +215,8 @@ def sync_entry():
                         }
                         if has_scan_reference_mode:
                             payload["scan_reference_mode"] = scan_reference_mode
+                        if has_period:
+                            payload["period"] = period
                         doc = frappe.get_doc(payload)
 
                     for item in entry_items:
@@ -366,9 +386,9 @@ def sync_entry():
     elif api_call_type == "get_entries":
         try:
             auth_user = frappe.session.user
-            has_scan_reference_mode = frappe.get_meta("Stock Take Entry").has_field(
-                "scan_reference_mode"
-            )
+            entry_meta = frappe.get_meta("Stock Take Entry")
+            has_scan_reference_mode = entry_meta.has_field("scan_reference_mode")
+            has_period = entry_meta.has_field("period")
             entry_fields = [
                 "name",
                 "company",
@@ -381,6 +401,8 @@ def sync_entry():
             ]
             if has_scan_reference_mode:
                 entry_fields.append("scan_reference_mode")
+            if has_period:
+                entry_fields.append("period")
 
             entries = frappe.get_all(
                 "Stock Take Entry",
